@@ -36,25 +36,13 @@ const authenticateAdmin = (req, res, next) => {
   const receivedPassword = req.headers['x-admin-password']?.trim();
   const envPassword = process.env.ADMIN_PASSWORD?.trim();
   
-  console.log('Auth Debug:', {
-    receivedPassword: receivedPassword ? 'Password received' : 'No password received',
-    passwordLength: receivedPassword ? receivedPassword.length : 0,
-    envPasswordSet: !!envPassword,
-    envPasswordLength: envPassword ? envPassword.length : 0,
-    // Debug info - remove after fixing
-    receivedPasswordChars: receivedPassword ? Array.from(receivedPassword).map(c => c.charCodeAt(0)) : [],
-    envPasswordChars: envPassword ? Array.from(envPassword).map(c => c.charCodeAt(0)) : [],
-    receivedPasswordRaw: receivedPassword,
-    envPasswordRaw: envPassword
-  });
+  // Normalize passwords by replacing multiple $ with single $
+  const normalizedReceivedPassword = receivedPassword?.replace(/\$\+/g, '$');
+  const normalizedEnvPassword = envPassword?.replace(/\$\+/g, '$');
   
-  if (receivedPassword === envPassword) {
+  if (normalizedReceivedPassword === normalizedEnvPassword) {
     next();
   } else {
-    console.log('Auth Failed:', {
-      receivedPassword: receivedPassword ? 'Password received' : 'No password received',
-      headers: req.headers
-    });
     res.status(401).json({ error: 'Unauthorized' });
   }
 };
@@ -119,7 +107,41 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Protected route to create short URL
+// Public route to create short URL
+app.post('/shorten', async (req, res) => {
+  const { originalUrl } = req.body;
+  
+  if (!originalUrl) {
+    return res.status(400).json({ error: 'URL is required' });
+  }
+
+  try {
+    let url = await Url.findOne({ originalUrl });
+    
+    if (url) {
+      return res.json({
+        shortUrl: `${process.env.BASE_URL}/${url.shortCode}`,
+        message: 'URL already exists'
+      });
+    }
+
+    const shortCode = shortId.generate();
+    url = new Url({
+      originalUrl,
+      shortCode
+    });
+
+    await url.save();
+    res.json({
+      shortUrl: `${process.env.BASE_URL}/${url.shortCode}`,
+      message: 'URL shortened successfully'
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Protected admin route to create short URL (keeping for backward compatibility)
 app.post('/admin/shorten', authenticateAdmin, async (req, res) => {
   const { originalUrl } = req.body;
   
@@ -232,6 +254,40 @@ app.get('/admin/urls', authenticateAdmin, async (req, res) => {
       browsers: Object.fromEntries(url.browsers),
       operatingSystems: Object.fromEntries(url.operatingSystems)
     })));
+  } catch (error) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Edit URL (protected admin route)
+app.put('/admin/urls/:shortCode', authenticateAdmin, async (req, res) => {
+  const { shortCode } = req.params;
+  const { originalUrl } = req.body;
+  
+  if (!originalUrl) {
+    return res.status(400).json({ error: 'URL is required' });
+  }
+
+  try {
+    const url = await Url.findOne({ shortCode });
+    
+    if (!url) {
+      return res.status(404).json({ error: 'URL not found' });
+    }
+
+    // Check if the new URL already exists
+    const existingUrl = await Url.findOne({ originalUrl });
+    if (existingUrl && existingUrl.shortCode !== shortCode) {
+      return res.status(400).json({ error: 'URL already exists' });
+    }
+
+    url.originalUrl = originalUrl;
+    await url.save();
+
+    res.json({
+      shortUrl: `${process.env.BASE_URL}/${url.shortCode}`,
+      message: 'URL updated successfully'
+    });
   } catch (error) {
     res.status(500).json({ error: 'Server error' });
   }

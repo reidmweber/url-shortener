@@ -30,7 +30,7 @@
             margin-bottom: 5px;
             color: #666;
         }
-        input[type="text"], input[type="password"] {
+        input[type="url"] {
             width: 100%;
             padding: 8px;
             border: 1px solid #ddd;
@@ -48,9 +48,9 @@
         button:hover {
             background-color: #0056b3;
         }
-        #result {
+        .result {
             margin-top: 20px;
-            padding: 10px;
+            padding: 15px;
             border-radius: 4px;
             display: none;
         }
@@ -73,65 +73,78 @@
         .nav-links a:hover {
             text-decoration: underline;
         }
+        .copy-button {
+            background-color: #28a745;
+            margin-left: 10px;
+        }
+        .copy-button:hover {
+            background-color: #218838;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="nav-links">
-            <a href="/admin.html">Admin Dashboard →</a>
+            <a href="/admin.html">Admin Dashboard</a>
         </div>
         <h1>URL Redirect Tracker</h1>
-        <form id="urlForm">
-            <div class="form-group">
-                <label for="url">URL to Track:</label>
-                <input type="text" id="url" name="url" required placeholder="https://example.com">
-            </div>
-            <div class="form-group">
-                <label for="password">Admin Password:</label>
-                <input type="password" id="password" name="password" required>
-            </div>
-            <button type="submit">Create Short URL</button>
-        </form>
-        <div id="result"></div>
+        <div class="form-group">
+            <label for="originalUrl">Enter URL to shorten:</label>
+            <input type="url" id="originalUrl" required placeholder="https://example.com">
+        </div>
+        <button onclick="shortenUrl()">Shorten URL</button>
+        <div id="result" class="result"></div>
     </div>
 
     <script>
-        document.getElementById('urlForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const url = document.getElementById('url').value;
-            const password = document.getElementById('password').value;
+        async function shortenUrl() {
+            const originalUrl = document.getElementById('originalUrl').value;
             const resultDiv = document.getElementById('result');
             
+            if (!originalUrl) {
+                resultDiv.textContent = 'Please enter a URL';
+                resultDiv.className = 'result error';
+                resultDiv.style.display = 'block';
+                return;
+            }
+
             try {
-                const response = await fetch('/admin/shorten', {
+                const response = await fetch('/shorten', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'x-admin-password': password
+                        'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ originalUrl: url })
+                    body: JSON.stringify({ originalUrl })
                 });
-                
+
                 const data = await response.json();
-                
-                if (response.ok) {
-                    resultDiv.className = 'success';
-                    resultDiv.innerHTML = `
-                        <p>Shortened URL created successfully!</p>
-                        <p>Short URL: <a href="${data.shortUrl}" target="_blank">${data.shortUrl}</a></p>
-                    `;
-                } else {
-                    resultDiv.className = 'error';
-                    resultDiv.innerHTML = `<p>Error: ${data.error}</p>`;
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to shorten URL');
                 }
+
+                resultDiv.innerHTML = `
+                    <div>Your shortened URL: <a href="${data.shortUrl}" target="_blank">${data.shortUrl}</a>
+                    <button class="copy-button" onclick="copyToClipboard('${data.shortUrl}')">Copy</button></div>
+                `;
+                resultDiv.className = 'result success';
             } catch (error) {
-                resultDiv.className = 'error';
-                resultDiv.innerHTML = '<p>Error creating shortened URL. Please try again.</p>';
+                resultDiv.textContent = error.message;
+                resultDiv.className = 'result error';
             }
-            
             resultDiv.style.display = 'block';
-        });
+        }
+
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                const button = event.target;
+                const originalText = button.textContent;
+                button.textContent = 'Copied!';
+                setTimeout(() => {
+                    button.textContent = originalText;
+                }, 2000);
+            });
+        }
     </script>
 </body>
 </html> 

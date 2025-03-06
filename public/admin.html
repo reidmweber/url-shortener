@@ -196,8 +196,21 @@
         </div>
     </div>
 
+    <div id="editModal" class="stats-modal">
+        <div class="stats-content">
+            <span class="close-button" onclick="closeEditModal()">&times;</span>
+            <h2>Edit URL</h2>
+            <div class="form-group">
+                <label for="editOriginalUrl">Original URL:</label>
+                <input type="url" id="editOriginalUrl" required>
+            </div>
+            <button onclick="saveEdit()">Save Changes</button>
+        </div>
+    </div>
+
     <script>
         let urlsData = []; // Store URLs data globally
+        let currentEditIndex = -1; // Track which URL is being edited
 
         async function loadUrls() {
             const password = document.getElementById('password').value;
@@ -236,6 +249,7 @@
                         <td>${lastClicked}</td>
                         <td>
                             <button onclick="viewStats(${index})">View Stats</button>
+                            <button onclick="editUrl(${index})">Edit</button>
                         </td>
                     `;
                     urlsBody.appendChild(row);
@@ -282,11 +296,63 @@
             document.getElementById('statsModal').style.display = 'none';
         }
 
-        // Close modal when clicking outside
+        function editUrl(index) {
+            currentEditIndex = index;
+            const url = urlsData[index];
+            document.getElementById('editOriginalUrl').value = url.originalUrl;
+            document.getElementById('editModal').style.display = 'block';
+        }
+
+        function closeEditModal() {
+            document.getElementById('editModal').style.display = 'none';
+            currentEditIndex = -1;
+        }
+
+        async function saveEdit() {
+            if (currentEditIndex === -1) return;
+
+            const password = document.getElementById('password').value;
+            const originalUrl = document.getElementById('editOriginalUrl').value;
+            const url = urlsData[currentEditIndex];
+
+            try {
+                const response = await fetch(`/admin/urls/${url.shortCode}`, {
+                    method: 'PUT',
+                    headers: {
+                        'x-admin-password': password,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ originalUrl })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Failed to update URL');
+                }
+
+                // Update the URL in our data
+                urlsData[currentEditIndex].originalUrl = originalUrl;
+                urlsData[currentEditIndex].shortUrl = `${window.location.origin}/${url.shortCode}`;
+
+                // Refresh the table
+                loadUrls();
+                closeEditModal();
+            } catch (error) {
+                const errorDiv = document.getElementById('error');
+                errorDiv.textContent = error.message;
+                errorDiv.style.display = 'block';
+            }
+        }
+
+        // Close modals when clicking outside
         window.onclick = function(event) {
-            const modal = document.getElementById('statsModal');
-            if (event.target === modal) {
-                modal.style.display = 'none';
+            const statsModal = document.getElementById('statsModal');
+            const editModal = document.getElementById('editModal');
+            if (event.target === statsModal) {
+                statsModal.style.display = 'none';
+            }
+            if (event.target === editModal) {
+                closeEditModal();
             }
         }
     </script>
