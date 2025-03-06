@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const shortId = require('shortid');
 const dotenv = require('dotenv');
 const path = require('path');
+const https = require('https');
 
 dotenv.config();
 const app = express();
@@ -13,6 +14,22 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Environment configuration
 const NODE_ENV = process.env.NODE_ENV || 'development';
 const COLLECTION_PREFIX = NODE_ENV === 'production' ? 'prod_' : 'test_';
+
+// Get service IP address
+app.get('/ip', async (req, res) => {
+  try {
+    const response = await new Promise((resolve, reject) => {
+      https.get('https://api.ipify.org?format=json', (res) => {
+        let data = '';
+        res.on('data', (chunk) => data += chunk);
+        res.on('end', () => resolve(JSON.parse(data)));
+      }).on('error', reject);
+    });
+    res.json({ ip: response.ip });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to get IP address' });
+  }
+});
 
 // Authentication middleware
 const authenticateAdmin = (req, res, next) => {
