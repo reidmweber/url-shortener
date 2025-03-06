@@ -210,13 +210,17 @@
             urlsBody.innerHTML = '';
             
             try {
+                console.log('Sending request with password length:', password.length);
                 const response = await fetch('/admin/urls', {
                     headers: {
-                        'x-admin-password': password
+                        'x-admin-password': password,
+                        'Content-Type': 'application/json'
                     }
                 });
                 
                 if (!response.ok) {
+                    const errorData = await response.json();
+                    console.error('Auth error:', errorData);
                     throw new Error('Unauthorized');
                 }
                 

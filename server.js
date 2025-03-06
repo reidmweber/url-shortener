@@ -34,9 +34,20 @@ app.get('/ip', async (req, res) => {
 // Authentication middleware
 const authenticateAdmin = (req, res, next) => {
   const password = req.headers['x-admin-password'];
+  console.log('Auth Debug:', {
+    receivedPassword: password ? 'Password received' : 'No password received',
+    passwordLength: password ? password.length : 0,
+    envPasswordSet: !!process.env.ADMIN_PASSWORD,
+    envPasswordLength: process.env.ADMIN_PASSWORD ? process.env.ADMIN_PASSWORD.length : 0
+  });
+  
   if (password === process.env.ADMIN_PASSWORD) {
     next();
   } else {
+    console.log('Auth Failed:', {
+      receivedPassword: password ? 'Password received' : 'No password received',
+      headers: req.headers
+    });
     res.status(401).json({ error: 'Unauthorized' });
   }
 };
