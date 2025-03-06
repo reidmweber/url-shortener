@@ -40,7 +40,12 @@ const authenticateAdmin = (req, res, next) => {
     receivedPassword: receivedPassword ? 'Password received' : 'No password received',
     passwordLength: receivedPassword ? receivedPassword.length : 0,
     envPasswordSet: !!envPassword,
-    envPasswordLength: envPassword ? envPassword.length : 0
+    envPasswordLength: envPassword ? envPassword.length : 0,
+    // Debug info - remove after fixing
+    receivedPasswordChars: receivedPassword ? Array.from(receivedPassword).map(c => c.charCodeAt(0)) : [],
+    envPasswordChars: envPassword ? Array.from(envPassword).map(c => c.charCodeAt(0)) : [],
+    receivedPasswordRaw: receivedPassword,
+    envPasswordRaw: envPassword
   });
   
   if (receivedPassword === envPassword) {
