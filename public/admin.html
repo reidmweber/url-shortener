@@ -221,7 +221,7 @@
                 if (!response.ok) {
                     const errorData = await response.json();
                     console.error('Auth error:', errorData);
-                    throw new Error('Unauthorized');
+                    throw new Error(errorData.error || 'Unauthorized');
                 }
                 
                 urlsData = await response.json(); // Store URLs data
