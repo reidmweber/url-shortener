@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>URL Redirect Tracker - Admin Dashboard</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #666;
+        }
+        input[type="password"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #urlsTable {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        #urlsTable th, #urlsTable td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        #urlsTable th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+        }
+        #urlsTable tr:hover {
+            background-color: #f5f5f5;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 20px;
+            display: none;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            display: none;
+        }
+        .nav-links {
+            margin-bottom: 20px;
+        }
+        .nav-links a {
+            color: #007bff;
+            text-decoration: none;
+            margin-right: 15px;
+        }
+        .nav-links a:hover {
+            text-decoration: underline;
+        }
+        .stats-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            z-index: 1000;
+        }
+        .stats-content {
+            position: relative;
+            background-color: white;
+            margin: 10% auto;
+            padding: 20px;
+            width: 80%;
+            max-width: 800px;
+            border-radius: 8px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        .close-button {
+            position: absolute;
+            right: 20px;
+            top: 10px;
+            font-size: 24px;
+            cursor: pointer;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .stats-box {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+        }
+        .stats-box h3 {
+            margin-top: 0;
+            color: #666;
+        }
+        .stats-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .stats-list li {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .stats-list li:last-child {
+            border-bottom: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="nav-links">
+            <a href="/">← Back to URL Redirect Tracker</a>
+        </div>
+        <h1>Admin Dashboard</h1>
+        <div class="form-group">
+            <label for="password">Admin Password:</label>
+            <input type="password" id="password" name="password" required>
+            <button onclick="loadUrls()">Load URLs</button>
+        </div>
+        <div id="loading" class="loading">Loading URLs...</div>
+        <div id="error" class="error"></div>
+        <table id="urlsTable">
+            <thead>
+                <tr>
+                    <th>Original URL</th>
+                    <th>Short URL</th>
+                    <th>Clicks</th>
+                    <th>Last Clicked</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="urlsBody"></tbody>
+        </table>
+    </div>
+
+    <div id="statsModal" class="stats-modal">
+        <div class="stats-content">
+            <span class="close-button" onclick="closeStatsModal()">&times;</span>
+            <h2>URL Statistics</h2>
+            <div id="statsGrid" class="stats-grid">
+                <div class="stats-box">
+                    <h3>Devices</h3>
+                    <ul id="devicesList" class="stats-list"></ul>
+                </div>
+                <div class="stats-box">
+                    <h3>Browsers</h3>
+                    <ul id="browsersList" class="stats-list"></ul>
+                </div>
+                <div class="stats-box">
+                    <h3>Operating Systems</h3>
+                    <ul id="osList" class="stats-list"></ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let urlsData = []; // Store URLs data globally
+
+        async function loadUrls() {
+            const password = document.getElementById('password').value;
+            const loadingDiv = document.getElementById('loading');
+            const errorDiv = document.getElementById('error');
+            const urlsBody = document.getElementById('urlsBody');
+            
+            loadingDiv.style.display = 'block';
+            errorDiv.style.display = 'none';
+            urlsBody.innerHTML = '';
+            
+            try {
+                const response = await fetch('/admin/urls', {
+                    headers: {
+                        'x-admin-password': password
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Unauthorized');
+                }
+                
+                urlsData = await response.json(); // Store URLs data
+                
+                urlsData.forEach((url, index) => {
+                    const row = document.createElement('tr');
+                    const lastClicked = url.lastClicked ? new Date(url.lastClicked).toLocaleString() : 'Never';
+                    row.innerHTML = `
+                        <td><a href="${url.originalUrl}" target="_blank">${url.originalUrl}</a></td>
+                        <td><a href="${url.shortUrl}" target="_blank">${url.shortUrl}</a></td>
+                        <td>${url.clicks}</td>
+                        <td>${lastClicked}</td>
+                        <td>
+                            <button onclick="viewStats(${index})">View Stats</button>
+                        </td>
+                    `;
+                    urlsBody.appendChild(row);
+                });
+            } catch (error) {
+                errorDiv.textContent = 'Error loading URLs. Please check your password and try again.';
+                errorDiv.style.display = 'block';
+            } finally {
+                loadingDiv.style.display = 'none';
+            }
+        }
+
+        function viewStats(index) {
+            const url = urlsData[index];
+            const modal = document.getElementById('statsModal');
+            const devicesList = document.getElementById('devicesList');
+            const browsersList = document.getElementById('browsersList');
+            const osList = document.getElementById('osList');
+
+            // Clear previous stats
+            devicesList.innerHTML = '';
+            browsersList.innerHTML = '';
+            osList.innerHTML = '';
+
+            // Add device stats
+            Object.entries(url.devices).forEach(([device, count]) => {
+                devicesList.innerHTML += `<li>${device}: ${count}</li>`;
+            });
+
+            // Add browser stats
+            Object.entries(url.browsers).forEach(([browser, count]) => {
+                browsersList.innerHTML += `<li>${browser}: ${count}</li>`;
+            });
+
+            // Add OS stats
+            Object.entries(url.operatingSystems).forEach(([os, count]) => {
+                osList.innerHTML += `<li>${os}: ${count}</li>`;
+            });
+
+            modal.style.display = 'block';
+        }
+
+        function closeStatsModal() {
+            document.getElementById('statsModal').style.display = 'none';
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('statsModal');
+            if (event.target === modal) {
+                modal.style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html> 
